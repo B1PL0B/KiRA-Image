@@ -205,10 +205,15 @@ document.addEventListener('DOMContentLoaded', () => {
             hideLoading();
         };
         originalImage.onerror = () => {
-            alert('Error loading image.');
+            console.error('Error loading image:', originalImageDataUrl);
+            alert('Error loading the image. Please check the console for details.');
             hideLoading();
             resetApp();
         };
+        if (!originalImageDataUrl) {
+             console.error('Error: originalImageDataUrl is null.');
+            return;
+        }
         originalImage.src = originalImageDataUrl;
     }
 
@@ -333,30 +338,48 @@ document.addEventListener('DOMContentLoaded', () => {
         // }
     }
 
+    // Refactored handleResizeInput function
     function handleResizeInput() {
         if (!originalImage) return;
 
         const aspect = originalWidth / originalHeight;
         const widthInput = resizeWidthInput;
         const heightInput = resizeHeightInput;
-        const changedInput = document.activeElement; // Find which input was changed
+        const changedInput = document.activeElement; 
 
-        let width = parseInt(widthInput.value, 10);
-        let height = parseInt(heightInput.value, 10);
+        let width = widthInput.value.trim() === '' ? '' : parseInt(widthInput.value, 10);
+        let height = heightInput.value.trim() === '' ? '' : parseInt(heightInput.value, 10);
 
-        if (aspectRatioToggle.checked) {
-            if (changedInput === widthInput && width > 0) {
-                heightInput.value = Math.round(width / aspect);
-            } else if (changedInput === heightInput && height > 0) {
-                widthInput.value = Math.round(height * aspect);
-            } else if (!widthInput.value && heightInput.value) {
-                // Handle case where width is deleted but height remains
-                widthInput.value = Math.round(height * aspect);
-            } else if (widthInput.value && !heightInput.value) {
-                 // Handle case where height is deleted but width remains
-                 heightInput.value = Math.round(width / aspect);
-            }
+        // If both inputs are empty, or if one or both are < 0, do nothing
+        if ((width === '' && height === '') || width < 0 || height < 0 ) {
+            return;
         }
+        
+        if (aspectRatioToggle.checked) {
+            // aspect ratio is ON
+             if (changedInput === widthInput) {
+                // width was changed
+                 if (width === '') {
+                     // width input is now empty
+                     heightInput.value = Math.round(originalHeight * (parseInt(heightInput.value, 10) / originalHeight));
+                } else {
+                    // width was changed and has value
+                     heightInput.value = Math.round(width / aspect);
+                 }
+            } else if (changedInput === heightInput) {
+                // height was changed
+                if (height === '') {
+                    // height input is now empty
+                    widthInput.value = Math.round(originalWidth * (parseInt(widthInput.value, 10) / originalWidth));
+                 } else {
+                    // height was changed and has value
+                     widthInput.value = Math.round(height * aspect);
+                 }
+            }
+        } 
+        // else: aspect ratio is OFF, no change
+        
+
 
         handleSettingsChange();
     }
@@ -397,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
              const sourceCanvas = await getResizedCanvas(options.resize);
 
             // 2. **CORE COMPRESSION LOGIC (Simulated)**
-            //    This is where the actual WebAssembly codec integration would happen.
+            // This is where the actual WebAssembly codec integration would happen.
             //    We pass the image data (from sourceCanvas) and options to the Wasm module.
             //    The module returns a compressed Blob or ArrayBuffer.
              processedBlob = await simulateCompression(sourceCanvas, options);
@@ -405,27 +428,35 @@ document.addEventListener('DOMContentLoaded', () => {
             // 3. Update processed canvas preview
             const processedImageUrl = URL.createObjectURL(processedBlob);
             const processedImg = new Image();
-            processedImg.onload = () => {
-                setCanvasDimensions(processedCanvas, processedImg.naturalWidth, processedImg.naturalHeight); // Update canvas size if format changes dimensions (rare)
-                processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
-                processedCtx.drawImage(processedImg, 0, 0, processedCanvas.width, processedCanvas.height);
-                URL.revokeObjectURL(processedImageUrl);
-                updateCompressedInfo(processedBlob.size);
-                downloadBtn.disabled = false;
-                hideLoading();
-            };
-             processedImg.onerror = () => {
-                console.error("Error loading processed image preview.");
-                alert("Error displaying compressed image. Check console for details.");
-                // Possibly revert to previous state or show error message
-                processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+            processedImg.onload =  () => {
+                try {
+                    setCanvasDimensions(processedCanvas, processedImg.naturalWidth, processedImg.naturalHeight); // Update canvas size if format changes dimensions (rare)
+                    processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+                    processedCtx.drawImage(processedImg, 0, 0, processedCanvas.width, processedCanvas.height);
+                    URL.revokeObjectURL(processedImageUrl);
+                    updateCompressedInfo(processedBlob.size);
+                    downloadBtn.disabled = false;
+                } catch (error) {
+                     console.error("Error processing the processed image:", error);
+                     alert("An error occurred while processing the compressed image. Check console for details.");
+                } finally {
+                    hideLoading();
+                }
+             };
+             processedImg.onerror = (error) => {
+                console.error("Error loading processed image preview.", error);
+                alert("Error displaying compressed image preview. Check console for details.");
+                processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height); // Clean up if error happens
                 downloadBtn.disabled = true;
-                hideLoading();
+                hideLoading(); 
             };
             processedImg.src = processedImageUrl;
 
         } catch (error) {
-            console.error('Processing Error:', error);
+            if(error.message === 'Canvas toBlob returned null') {
+                console.error('Error processing the image. Canvas toBlob returned null');
+            }
+            console.error('Processing Error: ', error);
             alert(`Error during image processing: ${error.message}`);
             updateCompressedInfo(0); // Reset compressed info
             downloadBtn.disabled = true;
@@ -464,12 +495,16 @@ document.addEventListener('DOMContentLoaded', () => {
     async function getResizedCanvas(resizeOptions) {
         return new Promise((resolve) => {
             if (!resizeOptions.enabled || (resizeOptions.width === originalWidth && resizeOptions.height === originalHeight)) {
-                 // No resize needed, use original canvas data
-                 resolve(originalCanvas);
-                 return;
+                // No resize needed, use original canvas data
+                resolve(originalCanvas);
+                return;
             }
 
-            const tempCanvas = document.createElement('canvas');
+            const tempCanvas = document.createElement('canvas');  
+             if (!tempCanvas) {
+                console.error("Error creating temporary canvas for resizing.");
+                return;
+            }
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = resizeOptions.width;
             tempCanvas.height = resizeOptions.height;
@@ -498,20 +533,25 @@ document.addEventListener('DOMContentLoaded', () => {
             // For formats like PNG where quality slider isn't the main factor,
             // we might ignore it or apply other logic (like palette reduction simulated here).
              if (mimeType === 'image/png' || mimeType === 'image/optipng') {
+                mimeType = 'image/png';
                 qualityParam = undefined; // toBlob ignores quality for PNG
                  console.log(`Simulating PNG/OptiPNG (palette: ${options.colors}) - Output will be standard PNG`);
                 // NOTE: Actual OptiPNG or palette reduction requires specific libraries/Wasm.
                 // This simulation just exports as standard PNG.
+            } else if (options.format === 'mozjpeg') {
+                 mimeType = 'image/jpeg';
+            } else if (mimeType === 'image/avif' || mimeType === 'image/jxl' || mimeType === 'image/webp') {
+                console.error(`Codec ${options.format.toUpperCase()} is not supported in this demo.`);
+                reject(new Error(`Codec ${options.format.toUpperCase()} is not supported in this demo.`));
+                return;
             }
-             if (mimeType === 'image/avif' || mimeType === 'image/jxl' || mimeType === 'image/webp') {
-                 console.warn(`Simulating ${mimeType.toUpperCase()} - Output will be standard PNG or JPEG as fallback in this demo.`);
-                 // In a real app, you'd call the specific Wasm encoder here.
-                 // For simulation, fall back to exporting as PNG or JPEG.
-                 // sourceCanvas.toBlob(resolve, 'image/png'); // Or 'image/jpeg', qualityParam
-                 // return;
-             }
 
+            
+            if (options.format === 'mozjpeg' && mimeType !== 'image/jpeg') {
+                mimeType = 'image/jpeg';
+            }
 
+            
             // Simulate delay
             setTimeout(() => {
                  try {
@@ -520,9 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (blob) {
                                 console.log(`Simulation Output MimeType: ${blob.type}, Size: ${formatBytes(blob.size)}`);
                                 // Inject correct type if browser defaulted (e.g. for OptiPNG sim)
-                                if ((options.format === 'optipng' || options.format === 'png') && blob.type !== 'image/png') {
-                                    blob = new Blob([blob], { type: 'image/png' });
-                                } else if (options.format === 'mozjpeg' && blob.type !== 'image/jpeg') {
+                                if(options.format === 'mozjpeg' && blob.type !== 'image/jpeg') {
                                      blob = new Blob([blob], { type: 'image/jpeg' });
                                 }
                                 resolve(blob);
@@ -567,7 +605,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function dragSlider(e) {
-        if (!isDraggingSlider || !imagePreviewContainer) return;
+        if (!isDraggingSlider) return;
+        if (!imagePreviewContainer) {
+            return console.error('imagePreviewContainer is null in dragSlider function.');
+        }
         e.preventDefault(); // Prevent scroll on touch
 
         const rect = imagePreviewContainer.getBoundingClientRect();
@@ -606,7 +647,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyZoomTransform(canvas) {
-         if (!canvas) return;
+         if (!canvas) {
+            console.error('Canvas is null in applyZoomTransform function.');
+            return;
+         }
          // Apply zoom using CSS transform
          canvas.style.transformOrigin = 'center center'; // Zoom from center
          canvas.style.transform = `scale(${currentZoom})`;
@@ -668,7 +712,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
      // --- Mobile Settings Panel Toggle ---
      function toggleMobileSettings() {
-         settingsPanel.classList.toggle('active');
+         if (window.innerWidth < 1024) {
+             settingsPanel.classList.toggle('active');
+         }
      }
 
     // --- Utility Functions ---

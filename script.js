@@ -66,6 +66,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialization ---
     setupEventListeners();
     updateThemeIcon(); // Set initial theme icon
+    // Modify the formatSelect element
+    formatSelect.innerHTML = `
+        <option value="mozjpeg">JPEG (MozJPEG)</option>
+        <option value="optipng">PNG (OptiPNG)</option>
+        <option value="webp">WebP</option>
+        <option value="avif">AVIF</option>
+        <option value="jxl">JPEG XL (Experimental)</option>
+        <option value="png">PNG (Original)</option>
+        <option value="jpeg">JPEG (Original)</option>
+    `;
+
 
     // --- Event Listeners Setup ---
     function setupEventListeners() {
@@ -115,6 +126,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Mobile Settings Toggle
         mobileSettingsToggle.addEventListener('click', toggleMobileSettings);
         // Close mobile settings if clicking outside
+         formatSelect.addEventListener('mouseover', () => {
+            const selectedFormat = formatSelect.value;
+            if (selectedFormat === 'avif' || selectedFormat === 'jxl' || selectedFormat === 'webp') {
+                 formatSelect.title = `${selectedFormat.toUpperCase()} codec is not supported yet. Simulation with JPEG/PNG.`;
+            } else {
+                formatSelect.title = ''; // Clear tooltip for supported formats
+            }
+        });
+
         document.addEventListener('click', (event) => {
              if (window.innerWidth < 1024 && settingsPanel.classList.contains('active')) {
                  if (!settingsPanel.contains(event.target) && !mobileSettingsToggle.contains(event.target)) {
@@ -219,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resetUI() {
         // Reset settings panel to defaults
-        formatSelect.value = 'mozjpeg'; // Default codec
+        formatSelect.value = 'mozjpeg';
         qualitySlider.value = 75;
         qualityValue.textContent = '75';
          colorPaletteSlider.value = 256;
@@ -318,13 +338,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
      function updateCodecSpecificUI() {
-        const selectedFormat = formatSelect.value;
-        if (selectedFormat === 'optipng' || selectedFormat === 'png') {
+          const selectedFormat = formatSelect.value;
+         if (selectedFormat === 'optipng') {
             qualitySection.classList.add('hidden');
             paletteSection.classList.remove('hidden');
+        } else if (selectedFormat === 'png') {
+            qualitySection.classList.add('hidden');
+            paletteSection.classList.add('hidden');
+        } else if (selectedFormat === 'jpeg' || selectedFormat === 'mozjpeg') {
+              qualitySection.classList.remove('hidden');
+              paletteSection.classList.add('hidden');
         } else {
-             qualitySection.classList.remove('hidden');
-             paletteSection.classList.add('hidden');
+            qualitySection.classList.remove('hidden');
+            paletteSection.classList.add('hidden');
         }
         // Add logic here to show/hide specific advanced options based on codec
         // Example:
@@ -396,7 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resizeHeightInput.value = '';
         aspectRatioToggle.checked = true;
         // Check if original image exists before triggering process
-         if (originalImage) {
+        if (originalImage) {
              handleSettingsChange();
          }
     }
@@ -540,11 +566,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 // This simulation just exports as standard PNG.
             } else if (options.format === 'mozjpeg') {
                  mimeType = 'image/jpeg';
-            } else if (mimeType === 'image/avif' || mimeType === 'image/jxl' || mimeType === 'image/webp') {
-                console.error(`Codec ${options.format.toUpperCase()} is not supported in this demo.`);
-                reject(new Error(`Codec ${options.format.toUpperCase()} is not supported in this demo.`));
-                return;
+            }else if (options.format === 'avif') {
+                 mimeType = 'image/avif';
+            } else if (options.format === 'jxl') {
+                 mimeType = 'image/jxl';
+             }else if (options.format === 'webp') {
+                 mimeType = 'image/webp';
             }
+
+            // No more error message for unsupported codecs
+             if (options.format === 'avif' || options.format === 'jxl' || options.format === 'webp') {
+                 console.log(`Simulating ${options.format.toUpperCase()} compression`);
+             }
+
+
+             console.log(`Simulating ${options.format.toUpperCase()} compression - Output will be ${mimeType.toUpperCase().replace('IMAGE/','')}`);
 
             
             if (options.format === 'mozjpeg' && mimeType !== 'image/jpeg') {
@@ -563,6 +599,10 @@ document.addEventListener('DOMContentLoaded', () => {
                                 if(options.format === 'mozjpeg' && blob.type !== 'image/jpeg') {
                                      blob = new Blob([blob], { type: 'image/jpeg' });
                                 }
+                                // Inject correct type for avif/jxl/webp
+                                if((options.format === 'avif' || options.format === 'jxl' || options.format === 'webp') && blob.type !== mimeType) {
+                                     blob = new Blob([blob], { type: mimeType });
+                                }
                                 resolve(blob);
                             } else {
                                 reject(new Error('Canvas toBlob returned null'));
@@ -580,13 +620,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- *** END PLACEHOLDER *** ---
 
     function updateCompressedInfo(compressedSizeBytes) {
+        const selectedFormat = formatSelect.value;
         if (!originalFile || compressedSizeBytes === 0) {
             compressedSizeDisplay.textContent = 'N/A';
             sizeReductionDisplay.textContent = '0%';
+            downloadBtn.disabled = true;
             return;
         }
         const originalSizeBytes = originalFile.size;
         compressedSizeDisplay.textContent = formatBytes(compressedSizeBytes);
+         // Disable download if unsupported format is selected
+         if (selectedFormat === 'avif' || selectedFormat === 'jxl' || selectedFormat === 'webp'){
+            downloadBtn.disabled = true;
+         }
         const reduction = originalSizeBytes > 0 ? ((originalSizeBytes - compressedSizeBytes) / originalSizeBytes) * 100 : 0;
         sizeReductionDisplay.textContent = `${Math.max(0, reduction).toFixed(1)}%`;
         sizeReductionDisplay.classList.toggle('text-green-600', reduction > 0);

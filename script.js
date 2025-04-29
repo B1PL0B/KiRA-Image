@@ -553,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // --- Simulation ---
              const targetFormat = options.format === 'mozjpeg' ? 'jpeg' : options.format; // Map mozjpeg to jpeg type
-             const mimeType = `image/${targetFormat}`;
+             let mimeType = `image/${targetFormat}`;
              let qualityParam = options.quality / 100; // Canvas quality is 0-1
 
             // For formats like PNG where quality slider isn't the main factor,

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KiRA Image - Compress & Convert Images</title>
+    <meta name="description" content="Optimize and convert images locally in your browser with KiRA Image, inspired by Squoosh. Fast, private, and efficient.">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        // Tailwind dark mode setup
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+        // Apply stored theme preference
+        if (localStorage.getItem('kira-theme') === 'dark' || (!('kira-theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans antialiased transition-colors duration-300 flex flex-col min-h-screen">
+
+    <header class="bg-white dark:bg-gray-800 shadow-md sticky top-0 z-20">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">KiRA Image</h1>
+            <div class="flex items-center space-x-4">
+                <label for="imageUploadInput" class="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out text-sm">
+                    <i class="fas fa-upload mr-1"></i> Upload Image
+                </label>
+                <input type="file" id="imageUploadInput" accept="image/jpeg, image/png, image/webp, image/avif, image/gif, image/bmp, image/tiff, image/jxl" class="hidden">
+                <button id="themeToggleBtn" title="Toggle Dark/Light Mode" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">
+                    <i class="fas fa-moon"></i> </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto p-4 flex flex-col lg:flex-row gap-4 relative">
+
+        <div id="dropZone" class="flex-grow border-2 border-dashed border-gray-400 dark:border-gray-600 rounded-lg flex items-center justify-center text-center p-8 lg:order-1 min-h-[300px] lg:min-h-0 bg-white dark:bg-gray-800 relative overflow-hidden">
+            <div id="uploadPrompt" class="text-gray-500 dark:text-gray-400">
+                <i class="fas fa-cloud-upload-alt text-4xl mb-4"></i>
+                <p class="font-semibold">Drag & drop your image here</p>
+                <p class="text-sm">or click the "Upload Image" button</p>
+                <p class="text-xs mt-2">(JPEG, PNG, WebP, AVIF, GIF, BMP, TIFF, JXL)</p>
+            </div>
+
+            <div id="imagePreviewContainer" class="hidden absolute inset-0 w-full h-full flex items-center justify-center">
+                 <div class="relative w-full h-full max-w-full max-h-full">
+                    <canvas id="originalCanvas" class="absolute top-0 left-0 w-full h-full object-contain"></canvas>
+                    <div id="processedImageWrapper" class="absolute top-0 left-0 w-full h-full overflow-hidden">
+                         <canvas id="processedCanvas" class="absolute top-0 left-0 w-full h-full object-contain"></canvas>
+                    </div>
+                    <div id="comparisonSlider" class="absolute top-0 bottom-0 w-1 bg-indigo-500 cursor-col-resize z-10 group">
+                         <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                            <i class="fas fa-arrows-alt-h"></i>
+                         </div>
+                    </div>
+                 </div>
+                 <div id="loadingIndicator" class="hidden absolute inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-20">
+                    <i class="fas fa-spinner fa-spin text-4xl text-white"></i>
+                 </div>
+            </div>
+        </div>
+
+        <aside id="settingsPanel" class="w-full lg:w-80 xl:w-96 bg-white dark:bg-gray-800 shadow-lg rounded-lg p-4 lg:order-2 flex-shrink-0 hidden lg:block space-y-4 overflow-y-auto max-h-[calc(100vh-150px)]">
+            <h2 class="text-lg font-semibold border-b border-gray-300 dark:border-gray-700 pb-2 mb-4">Compression Settings</h2>
+
+            <div>
+                <label for="formatSelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Output Format</label>
+                <select id="formatSelect" class="w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700">
+                    <option value="mozjpeg">JPEG (MozJPEG)</option>
+                    <option value="optipng">PNG (OptiPNG)</option>
+                    <option value="webp">WebP</option>
+                    <option value="avif">AVIF</option>
+                    <option value="jxl">JPEG XL (Experimental)</option>
+                    <option value="png">PNG (Original)</option>
+                    <option value="jpeg">JPEG (Original)</option>
+                    </select>
+            </div>
+
+            <div id="qualitySection">
+                <label for="qualitySlider" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Quality (<span id="qualityValue">75</span>)</label>
+                <input type="range" id="qualitySlider" min="0" max="100" value="75" class="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+            </div>
+
+             <div id="paletteSection" class="hidden">
+                <label for="colorPaletteSlider" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Colors (<span id="colorPaletteValue">256</span>)</label>
+                <input type="range" id="colorPaletteSlider" min="2" max="256" value="256" step="1" class="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+            </div>
+
+            <div class="border-t border-gray-300 dark:border-gray-700 pt-4">
+                <h3 class="text-md font-semibold mb-2">Resize</h3>
+                <div class="flex items-center space-x-2 mb-2">
+                    <input type="number" id="resizeWidth" placeholder="Width" class="w-1/2 rounded-md border-gray-300 dark:border-gray-600 shadow-sm text-sm bg-white dark:bg-gray-700">
+                    <span class="text-gray-500 dark:text-gray-400">px</span>
+                    <input type="number" id="resizeHeight" placeholder="Height" class="w-1/2 rounded-md border-gray-300 dark:border-gray-600 shadow-sm text-sm bg-white dark:bg-gray-700">
+                    <span class="text-gray-500 dark:text-gray-400">px</span>
+                </div>
+                 <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="aspectRatioToggle" checked class="h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 bg-white dark:bg-gray-700">
+                        <label for="aspectRatioToggle" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">Maintain aspect ratio</label>
+                    </div>
+                    <button id="resetResizeBtn" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Reset</button>
+                 </div>
+            </div>
+
+            <details class="border-t border-gray-300 dark:border-gray-700 pt-4">
+                <summary class="text-md font-semibold cursor-pointer">Advanced Options</summary>
+                <div id="advancedOptionsContainer" class="mt-2 space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                    <p class="text-xs italic">Advanced codec-specific options will appear here (e.g., smoothing, subsampling, dithering).</p>
+                </div>
+            </details>
+
+             <div class="border-t border-gray-300 dark:border-gray-700 pt-4">
+                 <button id="resetAllBtn" class="w-full text-sm text-center text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition duration-150 ease-in-out py-1 border border-gray-300 dark:border-gray-600 rounded-md hover:border-red-400">
+                    <i class="fas fa-undo mr-1"></i> Reset All Settings
+                </button>
+            </div>
+
+        </aside>
+         <button id="mobileSettingsToggle" class="lg:hidden fixed bottom-20 right-4 bg-indigo-600 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center z-30">
+            <i class="fas fa-sliders-h"></i>
+        </button>
+
+    </main>
+
+    <footer id="statusBar" class="bg-white dark:bg-gray-800 shadow-inner py-3 px-4 sticky bottom-0 z-20 hidden">
+         <div class="container mx-auto flex flex-wrap justify-between items-center gap-4 text-sm">
+            <div class="flex items-center space-x-4">
+                 <div title="Original Size">
+                    <span class="font-medium">Original:</span>
+                    <span id="originalSize">N/A</span>
+                    (<span id="originalDimensions">WxH</span>)
+                    <span id="originalType" class="text-gray-500 dark:text-gray-400 ml-1"></span>
+                 </div>
+                 <div title="Compressed Size">
+                    <span class="font-medium text-indigo-600 dark:text-indigo-400">Compressed:</span>
+                    <span id="compressedSize">N/A</span>
+                    (<span id="sizeReduction" class="text-green-600 dark:text-green-400 font-semibold">0%</span>)
+                 </div>
+            </div>
+             <div class="flex items-center space-x-4">
+                 <div class="flex items-center space-x-1">
+                    <button id="zoomOutBtn" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50" title="Zoom Out" disabled><i class="fas fa-search-minus"></i></button>
+                    <span id="zoomLevel" class="text-xs w-10 text-center">100%</span>
+                    <button id="zoomInBtn" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50" title="Zoom In" disabled><i class="fas fa-search-plus"></i></button>
+                     <button id="zoomResetBtn" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50 ml-1" title="Reset Zoom" disabled><i class="fas fa-expand"></i></button>
+                 </div>
+                 <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-download mr-1"></i> Download
+                 </button>
+             </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

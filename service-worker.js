@@ -8,6 +8,11 @@ const urlsToCache = [
     // Add paths to icons if they are local
     '/assets/icon-192.png',
     '/assets/icon-512.png',
+    // === ADD FAVICON PATHS HERE ===
+    '/assets/favicon.ico',
+    '/assets/favicon-16x16.png',
+    '/assets/favicon-32x32.png',
+    '/assets/apple-touch-icon.png',
     // Add CDNs if you want to cache them (consider potential updates)
     'https://cdn.tailwindcss.com?plugins=forms',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',

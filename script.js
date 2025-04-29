@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
+    const originalLabel = document.getElementById('originalLabel');
+    const compressedLabel = document.getElementById('compressedLabel');
     const dropZone = document.getElementById('dropZone');
     const uploadPrompt = document.getElementById('uploadPrompt');
     const imageUploadInput = document.getElementById('imageUploadInput');
@@ -176,10 +178,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleFile(file) {
-        if (!file.type.startsWith('image/')) {
+        if (!file.type.startsWith('image/') && file.type !== 'image/svg+xml') {
             alert('Please upload a valid image file.');
             return;
         }
+         const isSVG = file.type === 'image/svg+xml';
+         
         originalFile = file;
         currentFilename = file.name.substring(0, file.name.lastIndexOf('.')) || 'image'; // Store filename without extension
         const reader = new FileReader();
@@ -187,16 +191,32 @@ document.addEventListener('DOMContentLoaded', () => {
             originalImageDataUrl = e.target.result;
             loadImage();
         };
-        reader.readAsDataURL(file);
+         if (isSVG) {
+            reader.readAsText(file);
+        } else {
+            reader.readAsDataURL(file);
+        }
     }
 
     // --- Image Loading and Display ---
     async function loadImage() {
         showLoading();
+        if(originalFile.type === 'image/svg+xml') {
+            loadSvg();
+            return;
+        }
         originalImage = new Image();
+        if (!originalImageDataUrl) {
+             console.error('Error: originalImageDataUrl is null.');
+            return;
+        }
         originalImage.onload = async () => {
             originalWidth = originalImage.naturalWidth;
             originalHeight = originalImage.naturalHeight;
+            // Show labels for original and compressed images
+            originalLabel.classList.remove('hidden');
+            compressedLabel.classList.remove('hidden');
+
 
             // Reset UI elements
             resetUI();
@@ -230,13 +250,27 @@ document.addEventListener('DOMContentLoaded', () => {
             hideLoading();
             resetApp();
         };
-        if (!originalImageDataUrl) {
-             console.error('Error: originalImageDataUrl is null.');
-            return;
-        }
         originalImage.src = originalImageDataUrl;
     }
+    async function loadSvg() {
+            uploadPrompt.classList.add('hidden');
+            imagePreviewContainer.classList.remove('hidden');
+            settingsPanel.classList.remove('hidden');
+            statusBar.classList.remove('hidden');
+             if (window.innerWidth < 1024) {
+                settingsPanel.classList.remove('lg:block'); // Ensure it's not forced block on mobile
+            } else {
+                 settingsPanel.classList.add('lg:block');
+            }
+            mobileSettingsToggle.classList.remove('hidden');
+            formatSelect.value = 'png'; // Default to PNG for SVG
+            // Show labels for original and compressed images
+            originalLabel.classList.remove('hidden');
+            compressedLabel.classList.remove('hidden');
 
+            updateCodecSpecificUI();
+            updateOriginalInfo();
+        }
     function resetUI() {
         // Reset settings panel to defaults
         formatSelect.value = 'mozjpeg';
@@ -272,6 +306,10 @@ document.addEventListener('DOMContentLoaded', () => {
          imagePreviewContainer.classList.add('hidden');
          settingsPanel.classList.add('hidden');
          statusBar.classList.add('hidden');
+         // Hide labels for original and compressed images
+         originalLabel.classList.add('hidden');
+         compressedLabel.classList.add('hidden');
+
          mobileSettingsToggle.classList.add('hidden');
     }
 
@@ -331,6 +369,10 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(debounceTimer);
         showLoading(); // Show loading immediately for responsiveness
         updateCodecSpecificUI();
+        const selectedFormat = formatSelect.value;
+         if (selectedFormat === 'avif' || selectedFormat === 'jxl' || selectedFormat === 'webp') {
+             alert(`${selectedFormat.toUpperCase()} codec is not supported yet. Simulation with JPEG/PNG.`);
+         }
         debounceTimer = setTimeout(async () => {
             await processImage();
             hideLoading();
@@ -338,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
      function updateCodecSpecificUI() {
-          const selectedFormat = formatSelect.value;
+         const selectedFormat = formatSelect.value;
          if (selectedFormat === 'optipng') {
             qualitySection.classList.add('hidden');
             paletteSection.classList.remove('hidden');
@@ -552,13 +594,24 @@ document.addEventListener('DOMContentLoaded', () => {
             // 6. Error Handling: Catch errors from Wasm execution -> reject(error)
 
             // --- Simulation ---
-             const targetFormat = options.format === 'mozjpeg' ? 'jpeg' : options.format; // Map mozjpeg to jpeg type
-             let mimeType = `image/${targetFormat}`;
+             let targetFormat = options.format === 'mozjpeg' ? 'jpeg' : options.format; // Map mozjpeg to jpeg type
+              let mimeType = `image/${targetFormat}`;
              let qualityParam = options.quality / 100; // Canvas quality is 0-1
+
+
+            if (options.format === 'mozjpeg' || options.format === 'optipng' || options.format === 'jpeg' || options.format === 'png') {
+                 console.log(`${options.format.toUpperCase()} codec is supported.`);
+                 
+            } else {
+                // No more error message for unsupported codecs
+                if (options.format === 'avif' || options.format === 'jxl' || options.format === 'webp') {
+                    console.log(`Simulating ${options.format.toUpperCase()} compression`);
+                }
+            }
 
             // For formats like PNG where quality slider isn't the main factor,
             // we might ignore it or apply other logic (like palette reduction simulated here).
-             if (mimeType === 'image/png' || mimeType === 'image/optipng') {
+             if (options.format === 'png' || options.format === 'optipng') {
                 mimeType = 'image/png';
                 qualityParam = undefined; // toBlob ignores quality for PNG
                  console.log(`Simulating PNG/OptiPNG (palette: ${options.colors}) - Output will be standard PNG`);
@@ -573,13 +626,8 @@ document.addEventListener('DOMContentLoaded', () => {
              }else if (options.format === 'webp') {
                  mimeType = 'image/webp';
             }
-
-            // No more error message for unsupported codecs
-             if (options.format === 'avif' || options.format === 'jxl' || options.format === 'webp') {
-                 console.log(`Simulating ${options.format.toUpperCase()} compression`);
-             }
-
-
+            
+            
              console.log(`Simulating ${options.format.toUpperCase()} compression - Output will be ${mimeType.toUpperCase().replace('IMAGE/','')}`);
 
             
@@ -630,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const originalSizeBytes = originalFile.size;
         compressedSizeDisplay.textContent = formatBytes(compressedSizeBytes);
          // Disable download if unsupported format is selected
-         if (selectedFormat === 'avif' || selectedFormat === 'jxl' || selectedFormat === 'webp'){
+         if (selectedFormat === 'avif' || selectedFormat === 'jxl' || selectedFormat === 'webp' || originalFile.type === 'image/svg+xml'){
             downloadBtn.disabled = true;
          }
         const reduction = originalSizeBytes > 0 ? ((originalSizeBytes - compressedSizeBytes) / originalSizeBytes) * 100 : 0;

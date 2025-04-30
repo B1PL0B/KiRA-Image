@@ -169,20 +169,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function handleFile(file) {
+    async function handleFile(file) {
         if (!file.type.startsWith('image/') && file.type !== 'image/svg+xml') {
             alert('Please upload a valid image file.');
             return;
-        } 
+        }
         isSvg = file.type === 'image/svg+xml';
-        
-         
+
+
         originalFile = file;
         currentFilename = file.name.substring(0, file.name.lastIndexOf('.')) || 'image'; // Store filename without extension
         const reader = new FileReader();
         reader.onload = (e) => {
             originalImageDataUrl = e.target.result;
-            loadImage();
+            if (!isSvg) {
+                 loadImage();
+            }else{
+                loadSvg(file);
+            }
         };
          if (isSvg) {
             reader.readAsText(file);
@@ -192,14 +196,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Image Loading and Display ---
-    async function loadImage() {
+    function loadImage() {
         showLoading();
-
-        if(isSvg) {
-            loadSvg();
-            return;
-        }
         originalImage = new Image();
+        
+        
         if (!originalImageDataUrl) {
              console.error('Error: originalImageDataUrl is null.');
             return;
@@ -237,54 +238,38 @@ document.addEventListener('DOMContentLoaded', () => {
             await processImage();
             enableZoomControls();
             hideLoading();
-            displayCodecSupportStatus();
         };
         originalImage.onerror = () => {
             console.error('Error loading image:', originalImageDataUrl);
             alert('Error loading the image. Please check the console for details.');
             hideLoading();
             resetApp();
+            return;
         };
         originalImage.src = originalImageDataUrl;
-    }
-     async function processSvg(svgData) {
+    }   
+    async function loadSvg(file) {
+         showLoading();
+         originalImage = new Image();
+         originalImage.src = URL.createObjectURL(file);
         return new Promise((resolve, reject) => {
-             const serializer = new XMLSerializer();
-             const svg = new DOMParser().parseFromString(svgData, 'image/svg+xml').documentElement;
-            // draw in the canvas
-            setCanvasDimensions(processedCanvas, originalWidth, originalHeight);
-            processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
-            processedCtx.drawImage(originalImage, 0, 0, originalCanvas.width, originalCanvas.height);
-            resolve(svg);
-        });
+              originalImage.onload = async () => {
+                  originalWidth = originalImage.naturalWidth;
+                  originalHeight = originalImage.naturalHeight;
+                  // Update UI elements and show
+                  resetUI();
+                   updateOriginalInfo();
+                   setCanvasDimensions(originalCanvas, originalWidth, originalHeight);
+                   originalCtx.drawImage(originalImage, 0, 0, originalCanvas.width, originalCanvas.height);
+                  uploadPrompt.classList.add('hidden');
+                  imagePreviewContainer.classList.remove('hidden');
+                  enableZoomControls();
+                  hideLoading();
+                  resolve();
+              };
+         })
     }
-    async function loadSvg() {
-            originalImage = new Image();
-             originalImage.onload = async () => {
-                 originalWidth = originalImage.naturalWidth;
-                 originalHeight = originalImage.naturalHeight;
-                 setCanvasDimensions(originalCanvas, originalWidth, originalHeight);
-                 originalCtx.drawImage(originalImage, 0, 0, originalCanvas.width, originalCanvas.height);
-             };
-            uploadPrompt.classList.add('hidden');
-            imagePreviewContainer.classList.remove('hidden');
-            settingsPanel.classList.remove('hidden');
-            statusBar.classList.remove('hidden');
-             if (window.innerWidth < 1024) {
-                settingsPanel.classList.remove('lg:block'); // Ensure it's not forced block on mobile
-            } else {
-                 settingsPanel.classList.add('lg:block');
-            }
-            mobileSettingsToggle.classList.remove('hidden');
-            formatSelect.value = 'png'; // Default to PNG for SVG
-            // Show labels for original and compressed images
-            originalLabel.classList.remove('hidden');
-            compressedLabel.classList.remove('hidden');
-
-            updateOriginalInfo();
-            updateCodecSpecificUI();
-            enableZoomControls();
-            displayCodecSupportStatus();
+    async function processSvg(svgData) {
             resetUI();
             try {
                 await processSvg(originalImageDataUrl);
@@ -292,12 +277,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Error processing SVG image:", error);
                 alert("An error occurred while processing the SVG image.");
             }
-             downloadBtn.disabled = true;
-        }
-        
-     function displayCodecSupportStatus() {
-         const selectedFormat = formatSelect.value;
-         formatSelect.title = (selectedFormat === 'avif' || selectedFormat === 'jxl' || selectedFormat === 'webp') ? `${selectedFormat.toUpperCase()} codec is not supported yet. Simulation with JPEG/PNG.` : '';     }
+            downloadBtn.disabled = true;
+            hideLoading();
+    }
+    
     function resetUI() {
         // Reset settings panel to defaults
         formatSelect.value = 'mozjpeg';

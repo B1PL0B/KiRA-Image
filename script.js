@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isDraggingSlider = false;
     let debounceTimer = null;
     let currentFilename = 'image';
+    let isSvg = false;
 
     // Contexts for canvases
     const originalCtx = originalCanvas.getContext('2d');
@@ -127,15 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Mobile Settings Toggle
         mobileSettingsToggle.addEventListener('click', toggleMobileSettings);
-        // Close mobile settings if clicking outside
-         formatSelect.addEventListener('mouseover', () => {
-            const selectedFormat = formatSelect.value;
-            if (selectedFormat === 'avif' || selectedFormat === 'jxl' || selectedFormat === 'webp') {
-                 formatSelect.title = `${selectedFormat.toUpperCase()} codec is not supported yet. Simulation with JPEG/PNG.`;
-            } else {
-                formatSelect.title = ''; // Clear tooltip for supported formats
-            }
-        });
 
         document.addEventListener('click', (event) => {
              if (window.innerWidth < 1024 && settingsPanel.classList.contains('active')) {
@@ -181,8 +173,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!file.type.startsWith('image/') && file.type !== 'image/svg+xml') {
             alert('Please upload a valid image file.');
             return;
-        }
-         const isSVG = file.type === 'image/svg+xml';
+        } 
+        isSvg = file.type === 'image/svg+xml';
+        
          
         originalFile = file;
         currentFilename = file.name.substring(0, file.name.lastIndexOf('.')) || 'image'; // Store filename without extension
@@ -191,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
             originalImageDataUrl = e.target.result;
             loadImage();
         };
-         if (isSVG) {
+         if (isSvg) {
             reader.readAsText(file);
         } else {
             reader.readAsDataURL(file);
@@ -201,7 +194,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Image Loading and Display ---
     async function loadImage() {
         showLoading();
-        if(originalFile.type === 'image/svg+xml') {
+
+        if(isSvg) {
             loadSvg();
             return;
         }
@@ -243,6 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await processImage();
             enableZoomControls();
             hideLoading();
+            displayCodecSupportStatus();
         };
         originalImage.onerror = () => {
             console.error('Error loading image:', originalImageDataUrl);
@@ -252,7 +247,25 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         originalImage.src = originalImageDataUrl;
     }
+     async function processSvg(svgData) {
+        return new Promise((resolve, reject) => {
+             const serializer = new XMLSerializer();
+             const svg = new DOMParser().parseFromString(svgData, 'image/svg+xml').documentElement;
+            // draw in the canvas
+            setCanvasDimensions(processedCanvas, originalWidth, originalHeight);
+            processedCtx.clearRect(0, 0, processedCanvas.width, processedCanvas.height);
+            processedCtx.drawImage(originalImage, 0, 0, originalCanvas.width, originalCanvas.height);
+            resolve(svg);
+        });
+    }
     async function loadSvg() {
+            originalImage = new Image();
+             originalImage.onload = async () => {
+                 originalWidth = originalImage.naturalWidth;
+                 originalHeight = originalImage.naturalHeight;
+                 setCanvasDimensions(originalCanvas, originalWidth, originalHeight);
+                 originalCtx.drawImage(originalImage, 0, 0, originalCanvas.width, originalCanvas.height);
+             };
             uploadPrompt.classList.add('hidden');
             imagePreviewContainer.classList.remove('hidden');
             settingsPanel.classList.remove('hidden');
@@ -268,9 +281,23 @@ document.addEventListener('DOMContentLoaded', () => {
             originalLabel.classList.remove('hidden');
             compressedLabel.classList.remove('hidden');
 
-            updateCodecSpecificUI();
             updateOriginalInfo();
+            updateCodecSpecificUI();
+            enableZoomControls();
+            displayCodecSupportStatus();
+            resetUI();
+            try {
+                await processSvg(originalImageDataUrl);
+            } catch (error) {
+                console.error("Error processing SVG image:", error);
+                alert("An error occurred while processing the SVG image.");
+            }
+             downloadBtn.disabled = true;
         }
+        
+     function displayCodecSupportStatus() {
+         const selectedFormat = formatSelect.value;
+         formatSelect.title = (selectedFormat === 'avif' || selectedFormat === 'jxl' || selectedFormat === 'webp') ? `${selectedFormat.toUpperCase()} codec is not supported yet. Simulation with JPEG/PNG.` : '';     }
     function resetUI() {
         // Reset settings panel to defaults
         formatSelect.value = 'mozjpeg';
@@ -300,6 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
          originalImageDataUrl = null;
          originalFile = null;
          processedBlob = null;
+         isSvg = false;
          currentFilename = 'image';
          resetUI();
          uploadPrompt.classList.remove('hidden');
@@ -369,20 +397,14 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(debounceTimer);
         showLoading(); // Show loading immediately for responsiveness
         updateCodecSpecificUI();
-        const selectedFormat = formatSelect.value;
-         if (selectedFormat === 'avif' || selectedFormat === 'jxl' || selectedFormat === 'webp') {
-             alert(`${selectedFormat.toUpperCase()} codec is not supported yet. Simulation with JPEG/PNG.`);
-         }
+        displayCodecSupportStatus();
         debounceTimer = setTimeout(async () => {
             await processImage();
             hideLoading();
         }, DEBOUNCE_DELAY);
     }
 
-     function updateCodecSpecificUI() {
-         const selectedFormat = formatSelect.value;
-         if (selectedFormat === 'optipng') {
-            qualitySection.classList.add('hidden');
+    function updateCodecSpecificUI() { const selectedFormat = formatSelect.value; if (selectedFormat === 'optipng') { qualitySection.classList.add('hidden');
             paletteSection.classList.remove('hidden');
         } else if (selectedFormat === 'png') {
             qualitySection.classList.add('hidden');
@@ -394,18 +416,10 @@ document.addEventListener('DOMContentLoaded', () => {
             qualitySection.classList.remove('hidden');
             paletteSection.classList.add('hidden');
         }
-        // Add logic here to show/hide specific advanced options based on codec
-        // Example:
-        // advancedOptionsContainer.innerHTML = ''; // Clear previous options
-        // if (selectedFormat === 'mozjpeg') {
-        //     advancedOptionsContainer.innerHTML = `<p>MozJPEG options...</p>`;
-        // } else if (selectedFormat === 'webp') {
-        //     advancedOptionsContainer.innerHTML = `<p>WebP options...</p>`;
-        // } else {
-        //     advancedOptionsContainer.innerHTML = `<p class="text-xs italic">No advanced options for this format yet.</p>`;
-        // }
+          displayCodecSupportStatus();
     }
-
+    
+    
     // Refactored handleResizeInput function
     function handleResizeInput() {
         if (!originalImage) return;
@@ -418,20 +432,30 @@ document.addEventListener('DOMContentLoaded', () => {
         let width = widthInput.value.trim() === '' ? '' : parseInt(widthInput.value, 10);
         let height = heightInput.value.trim() === '' ? '' : parseInt(heightInput.value, 10);
 
-        // If both inputs are empty, or if one or both are < 0, do nothing
-        if ((width === '' && height === '') || width < 0 || height < 0 ) {
-            return;
+        if (width < 0 ) {
+            width = Math.max(0, width); // Ensure width is not negative
+             widthInput.value = width;
+        }
+         if (height < 0 ) {
+            height = Math.max(0, height); // Ensure height is not negative
+            heightInput.value = height;
         }
         
         if (aspectRatioToggle.checked) {
             // aspect ratio is ON
              if (changedInput === widthInput) {
-                // width was changed
+                // width input was changed
                  if (width === '') {
                      // width input is now empty
                      heightInput.value = Math.round(originalHeight * (parseInt(heightInput.value, 10) / originalHeight));
                 } else {
                     // width was changed and has value
+                    if (width > originalWidth) {
+                        width = originalWidth;
+                        widthInput.value = width;
+                    }
+                    
+
                      heightInput.value = Math.round(width / aspect);
                  }
             } else if (changedInput === heightInput) {
@@ -441,13 +465,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     widthInput.value = Math.round(originalWidth * (parseInt(widthInput.value, 10) / originalWidth));
                  } else {
                     // height was changed and has value
+                     if (height > originalHeight) {
+                         height = originalHeight;
+                         heightInput.value = height;
+                     }
                      widthInput.value = Math.round(height * aspect);
                  }
             }
         } 
         // else: aspect ratio is OFF, no change
         
-
+        // check again if new values are greater than the original size
+        if (width > originalWidth) widthInput.value = originalWidth;
+        if (height > originalHeight) heightInput.value = originalHeight;
+        
 
         handleSettingsChange();
     }
@@ -470,16 +501,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetAllSettings() {
-        if (!originalImage) return;
-        resetUI(); // Reset controls to default
-        loadImage(); // Reload original image data and trigger default compression
-    }
+         if (!originalImage) return;
+         resetApp();
+     }
+
 
 
     // --- Image Processing ---
     async function processImage() {
-        if (!originalImage) return;
+        if (!originalImage && !isSvg) return;
         showLoading();
+
+        if(isSvg) {
+            return processSvg(originalImageDataUrl);
+        }
 
         const options = getCurrentSettings();
 
@@ -521,8 +556,10 @@ document.addEventListener('DOMContentLoaded', () => {
             processedImg.src = processedImageUrl;
 
         } catch (error) {
-            if(error.message === 'Canvas toBlob returned null') {
-                console.error('Error processing the image. Canvas toBlob returned null');
+             if(error.message === 'Canvas toBlob returned null') {
+                 console.error('Error processing the image. Canvas toBlob returned null, maybe the format is not supported in this browser.');
+                 alert('Error processing the image. The image format may not be supported by this browser. Please try a different format.');
+                 
             }
             console.error('Processing Error: ', error);
             alert(`Error during image processing: ${error.message}`);
@@ -599,16 +636,9 @@ document.addEventListener('DOMContentLoaded', () => {
              let qualityParam = options.quality / 100; // Canvas quality is 0-1
 
 
-            if (options.format === 'mozjpeg' || options.format === 'optipng' || options.format === 'jpeg' || options.format === 'png') {
-                 console.log(`${options.format.toUpperCase()} codec is supported.`);
-                 
-            } else {
-                // No more error message for unsupported codecs
-                if (options.format === 'avif' || options.format === 'jxl' || options.format === 'webp') {
+            if (options.format === 'avif' || options.format === 'jxl' || options.format === 'webp') {
                     console.log(`Simulating ${options.format.toUpperCase()} compression`);
                 }
-            }
-
             // For formats like PNG where quality slider isn't the main factor,
             // we might ignore it or apply other logic (like palette reduction simulated here).
              if (options.format === 'png' || options.format === 'optipng') {
@@ -640,7 +670,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                  try {
                     sourceCanvas.toBlob(
-                        (blob) => {
+                       (blob) => {
                             if (blob) {
                                 console.log(`Simulation Output MimeType: ${blob.type}, Size: ${formatBytes(blob.size)}`);
                                 // Inject correct type if browser defaulted (e.g. for OptiPNG sim)
@@ -653,7 +683,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 }
                                 resolve(blob);
                             } else {
-                                reject(new Error('Canvas toBlob returned null'));
+                                reject(new Error('Canvas toBlob returned null')); // or 'Canvas toBlob failed'
                             }
                         },
                         mimeType, // Target MIME type
@@ -701,9 +731,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function dragSlider(e) {
         if (!isDraggingSlider) return;
         if (!imagePreviewContainer) {
-            return console.error('imagePreviewContainer is null in dragSlider function.');
+            stopSliderDrag();
+            return;
         }
-        e.preventDefault(); // Prevent scroll on touch
 
         const rect = imagePreviewContainer.getBoundingClientRect();
          // Get clientX from touch or mouse event
@@ -741,8 +771,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function applyZoomTransform(canvas) {
-         if (!canvas) {
-            console.error('Canvas is null in applyZoomTransform function.');
+         if (!canvas || !originalImage) {
+             console.warn('Canvas is null or original image is not loaded in applyZoomTransform function.');
             return;
          }
          // Apply zoom using CSS transform

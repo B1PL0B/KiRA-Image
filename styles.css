@@ -9,13 +9,28 @@ body {
     touch-action: none; /* Prevent scrolling on touch devices when dragging */
 }
 
-#comparisonSlider::before {
-    content: '';
+#comparisonSlider::before { /* This is the extended hit area */
+     content: '';
     position: absolute;
     top: 0;
     bottom: 0;
     left: -4px; /* Extend hit area */
     right: -4px; /* Extend hit area */
+}
+
+#comparisonSlider .handle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px; /* Size of the handle */
+    height: 20px; /* Size of the handle */
+    border-radius: 50%;
+    background-color: #4f46e5; /* indigo-600 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 11; /* Above the bar */
 }
 
 
@@ -103,3 +118,20 @@ input[type=number] {
         transform: translateY(0);
     }
 }
+
+/* Codec Support Indicator */
+.codec-support-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 5px;
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.supported { background-color: #48bb78; } /* Green */
+
+.unsupported { background-color: #f56565; } /* Red */

@@ -6,10 +6,10 @@
     <title>KiRA Image - Compress & Convert Images</title>
     <meta name="description" content="Optimize and convert images locally in your browser with KiRA Image, inspired by Squoosh. Fast, private, and efficient.">
     <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
 
-<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
 
 
     <link rel="manifest" href="manifest.json">
@@ -46,13 +46,15 @@
         <div class="container mx-auto px-4 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">KiRA Image</h1>
             <div class="flex items-center space-x-4">
-                <label for="imageUploadInput" class="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out text-sm">
+                <label for="imageUploadInput"  class="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out text-sm">
                     <i class="fas fa-upload mr-1"></i> Upload Image
                 </label>
                 <input type="file" id="imageUploadInput" accept="image/jpeg, image/png, image/webp, image/avif, image/gif, image/bmp, image/tiff, image/jxl" class="hidden">
-                <button id="themeToggleBtn" title="Toggle Dark/Light Mode" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">
+                <button type="button" id="themeToggleBtn" title="Toggle Dark/Light Mode" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition">
                     <i class="fas fa-moon"></i> </button>
+                <button type="button" id="mobileSettingsToggle" class="lg:hidden bg-indigo-600 text-white w-10 h-10 rounded-full shadow-lg flex items-center justify-center "> <i class="fas fa-sliders-h"></i> </button>
             </div>
+
         </div>
     </header>
 
@@ -72,7 +74,7 @@
                     <div id="processedImageWrapper" class="absolute top-0 left-0 w-full h-full overflow-hidden">
                          <canvas id="processedCanvas" class="absolute top-0 left-0 w-full h-full object-contain"></canvas>
                     </div>
-                    <div id="comparisonSlider" class="absolute top-0 bottom-0 w-1 bg-indigo-500 cursor-col-resize z-10 group">
+                    <div id="comparisonSlider" title="Drag to compare" class="absolute top-0 bottom-0 w-1 bg-indigo-500 cursor-col-resize z-10 group">
                          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                             <i class="fas fa-arrows-alt-h"></i>
                          </div>
@@ -88,6 +90,7 @@
             <h2 class="text-lg font-semibold border-b border-gray-300 dark:border-gray-700 pb-2 mb-4">Compression Settings</h2>
 
             <div>
+                <div id="codecSupportIndicator"></div>
                 <label for="formatSelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Output Format</label>
                 <select id="formatSelect" class="w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm bg-white dark:bg-gray-700">
                     <option value="mozjpeg">JPEG (MozJPEG)</option>
@@ -96,7 +99,6 @@
                     <option value="avif">AVIF</option>
                     <option value="jxl">JPEG XL (Experimental)</option>
                     <option value="png">PNG (Original)</option>
-                    <option value="jpeg">JPEG (Original)</option>
                     </select>
             </div>
 
@@ -123,7 +125,7 @@
                         <input type="checkbox" id="aspectRatioToggle" checked class="h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 bg-white dark:bg-gray-700">
                         <label for="aspectRatioToggle" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">Maintain aspect ratio</label>
                     </div>
-                    <button id="resetResizeBtn" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Reset</button>
+                    <button type="button" id="resetResizeBtn" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Reset</button>
                  </div>
             </div>
 
@@ -135,14 +137,11 @@
             </details>
 
              <div class="border-t border-gray-300 dark:border-gray-700 pt-4">
-                 <button id="resetAllBtn" class="w-full text-sm text-center text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition duration-150 ease-in-out py-1 border border-gray-300 dark:border-gray-600 rounded-md hover:border-red-400">
+                 <button type="button" id="resetAllBtn" class="w-full text-sm text-center text-gray-600 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition duration-150 ease-in-out py-1 border border-gray-300 dark:border-gray-600 rounded-md hover:border-red-400">
                     <i class="fas fa-undo mr-1"></i> Reset All Settings
                 </button>
             </div>
 
-        </aside>
-         <button id="mobileSettingsToggle" class="lg:hidden fixed bottom-20 right-4 bg-indigo-600 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center z-30">
-            <i class="fas fa-sliders-h"></i>
         </button>
 
     </main>
@@ -164,12 +163,12 @@
             </div>
              <div class="flex items-center space-x-4">
                  <div class="flex items-center space-x-1">
-                    <button id="zoomOutBtn" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50" title="Zoom Out" disabled><i class="fas fa-search-minus"></i></button>
+                    <button type="button" id="zoomOutBtn" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50" title="Zoom Out" disabled><i class="fas fa-search-minus"></i></button>
                     <span id="zoomLevel" class="text-xs w-10 text-center">100%</span>
-                    <button id="zoomInBtn" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50" title="Zoom In" disabled><i class="fas fa-search-plus"></i></button>
-                     <button id="zoomResetBtn" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50 ml-1" title="Reset Zoom" disabled><i class="fas fa-expand"></i></button>
+                    <button type="button" id="zoomInBtn" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50" title="Zoom In" disabled><i class="fas fa-search-plus"></i></button>
+                     <button type="button" id="zoomResetBtn" class="text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 disabled:opacity-50 ml-1" title="Reset Zoom" disabled><i class="fas fa-expand"></i></button>
                  </div>
-                 <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                 <button type="button" id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                     <i class="fas fa-download mr-1"></i> Download
                  </button>
              </div>
